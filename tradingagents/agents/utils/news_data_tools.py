@@ -27,10 +27,13 @@ def get_global_news(
     limit: Annotated[Optional[int], "Max articles to return; omit to use the configured default"] = None,
 ) -> str:
     """
-    Retrieve global news data.
+    Retrieve global macro-economic and market news.
     Uses the configured news_data vendor. Defaults for look_back_days and
     limit come from DEFAULT_CONFIG (global_news_lookback_days,
     global_news_article_limit); pass explicit values to override.
+
+    This covers broad market topics (monetary policy, GDP, geopolitics,
+    commodities, etc.). For ticker-specific news, use ``get_news`` instead.
 
     Args:
         curr_date (str): Current date in yyyy-mm-dd format
@@ -38,7 +41,7 @@ def get_global_news(
         limit (int): Maximum number of articles to return; omit to inherit config
 
     Returns:
-        str: A formatted string containing global news data
+        str: A formatted string containing global macro news data
     """
     return route_to_vendor("get_global_news", curr_date, look_back_days, limit)
 

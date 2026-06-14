@@ -93,7 +93,7 @@ def get_news_yfinance(
     article_limit = get_config()["news_article_limit"]
     try:
         stock = ticker_with_timeout(ticker)
-        news = yf_retry(lambda: stock.get_news(count=article_limit, timeout=30))
+        news = yf_retry(lambda: stock.get_news(count=article_limit))
 
         if not news:
             return f"No news found for {ticker}"
@@ -145,7 +145,7 @@ def get_global_news_yfinance(
             ``global_news_article_limit`` from the active config.
 
     Returns:
-        Formatted string containing global news articles
+        Formatted string containing global macro news articles
     """
     config = get_config()
     if look_back_days is None:
