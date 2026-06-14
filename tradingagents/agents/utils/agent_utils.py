@@ -75,9 +75,10 @@ def resolve_instrument_identity(ticker: str) -> dict:
     resolves for the same instrument the price path actually fetches (#983).
     """
     from tradingagents.dataflows.symbol_utils import normalize_symbol
+    from tradingagents.dataflows.stockstats_utils import ticker_with_timeout
 
     try:
-        info = yf.Ticker(normalize_symbol(ticker)).info or {}
+        info = ticker_with_timeout(normalize_symbol(ticker)).info or {}
     except Exception as exc:  # noqa: BLE001 — fail open, never block the run
         logger.debug("Could not resolve instrument identity for %s: %s", ticker, exc)
         return {}

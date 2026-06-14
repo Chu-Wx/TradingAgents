@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 import yfinance as yf
 import os
-from .stockstats_utils import StockstatsUtils, _clean_dataframe, yf_retry, load_ohlcv, filter_financials_by_date
+from .stockstats_utils import StockstatsUtils, _clean_dataframe, yf_retry, load_ohlcv, filter_financials_by_date, ticker_with_timeout
 from .symbol_utils import normalize_symbol, NoMarketDataError
 
 def get_YFin_data_online(
@@ -18,13 +18,13 @@ def get_YFin_data_online(
 
     # Resolve broker/forex symbols to Yahoo's convention (XAUUSD+ -> GC=F).
     canonical = normalize_symbol(symbol)
-    ticker = yf.Ticker(canonical)
+    ticker = ticker_with_timeout(canonical)
 
     # yfinance treats ``end`` as EXCLUSIVE, so it would drop the requested
     # end_date row (and the current day when end_date is today). Request one day
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
-    data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
+    data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive, timeout=30))
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
     # instead of returning prose: the routing layer turns it into a single
@@ -265,7 +265,7 @@ def get_fundamentals(
     """Get company fundamentals overview from yfinance."""
     canonical = normalize_symbol(ticker)
     try:
-        ticker_obj = yf.Ticker(canonical)
+        ticker_obj = ticker_with_timeout(canonical)
         info = yf_retry(lambda: ticker_obj.info)
 
         if not info:
@@ -333,7 +333,7 @@ def get_balance_sheet(
     """Get balance sheet data from yfinance."""
     canonical = normalize_symbol(ticker)
     try:
-        ticker_obj = yf.Ticker(canonical)
+        ticker_obj = ticker_with_timeout(canonical)
 
         if freq.lower() == "quarterly":
             data = yf_retry(lambda: ticker_obj.quarterly_balance_sheet)
@@ -368,7 +368,7 @@ def get_cashflow(
     """Get cash flow data from yfinance."""
     canonical = normalize_symbol(ticker)
     try:
-        ticker_obj = yf.Ticker(canonical)
+        ticker_obj = ticker_with_timeout(canonical)
 
         if freq.lower() == "quarterly":
             data = yf_retry(lambda: ticker_obj.quarterly_cashflow)
@@ -403,7 +403,7 @@ def get_income_statement(
     """Get income statement data from yfinance."""
     canonical = normalize_symbol(ticker)
     try:
-        ticker_obj = yf.Ticker(canonical)
+        ticker_obj = ticker_with_timeout(canonical)
 
         if freq.lower() == "quarterly":
             data = yf_retry(lambda: ticker_obj.quarterly_income_stmt)
@@ -436,7 +436,7 @@ def get_insider_transactions(
     """Get insider transactions data from yfinance."""
     canonical = normalize_symbol(ticker)
     try:
-        ticker_obj = yf.Ticker(canonical)
+        ticker_obj = ticker_with_timeout(canonical)
         data = yf_retry(lambda: ticker_obj.insider_transactions)
 
         # Empty is normal here (many valid symbols have no insider filings),

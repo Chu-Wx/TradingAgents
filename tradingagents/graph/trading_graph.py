@@ -247,8 +247,8 @@ class TradingAgentsGraph:
             # Normalize so the realized-return lookup hits the same instrument
             # the analysis priced (e.g. XAUUSD -> GC=F) (#984). The benchmark is
             # already a canonical Yahoo symbol from ``_resolve_benchmark``.
-            stock = yf.Ticker(normalize_symbol(ticker)).history(start=trade_date, end=end_str)
-            bench = yf.Ticker(benchmark).history(start=trade_date, end=end_str)
+            stock = yf.Ticker(normalize_symbol(ticker)).history(start=trade_date, end=end_str, timeout=30)
+            bench = yf.Ticker(benchmark).history(start=trade_date, end=end_str, timeout=30)
 
             if len(stock) < 2 or len(bench) < 2:
                 return None, None, None

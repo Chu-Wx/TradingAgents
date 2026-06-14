@@ -13,21 +13,99 @@ from .symbol_utils import normalize_symbol, NoMarketDataError
 
 logger = logging.getLogger(__name__)
 
+# yfinance v0.2.58+ uses curl_cffi sessions internally to impersonate a Chrome
+# browser at the TLS level, which is how it avoids Yahoo's bot-detection 429s.
+# Creating a plain ``requests.Session`` and passing it to ``yf.Ticker()``
+# OVERRIDES that impersonation and triggers immediate rate-limiting.
+#
+# ``ticker_with_timeout()`` therefore creates a curl_cffi session (when
+# available) with the same ``impersonate="chrome"`` default that yfinance
+# uses internally, plus an explicit ``timeout`` so a dropped TCP connection
+# never hangs forever. On platforms where curl_cffi cannot be installed
+# (e.g. some serverless runtimes), we fall back to a plain requests.Session
+# with a timeout adapter — which may trigger 429s but at least won't hang.
+_DEFAULT_YF_TIMEOUT = 30
 
-def yf_retry(func, max_retries=3, base_delay=2.0):
+
+def _create_timeout_session():
+    """Return a session with a default send-timeout.
+
+    Prefers curl_cffi (Chrome TLS impersonation → no 429s from Yahoo's bot
+    detection). Falls back to a plain requests.Session with a
+    TimeoutHTTPAdapter when curl_cffi is unavailable.
+    """
+    try:
+        from curl_cffi import requests as curl_requests
+
+        session = curl_requests.Session(impersonate="chrome")
+        session.timeout = _DEFAULT_YF_TIMEOUT
+        return session
+    except ImportError:
+        import requests as plain_requests
+
+        session = plain_requests.Session()
+
+        class _TimeoutHTTPAdapter(plain_requests.adapters.HTTPAdapter):
+            def __init__(self, timeout=_DEFAULT_YF_TIMEOUT, *args, **kwargs):
+                self._default_timeout = timeout
+                super().__init__(*args, **kwargs)
+
+            def send(self, request, **kwargs):
+                kwargs.setdefault("timeout", self._default_timeout)
+                return super().send(request, **kwargs)
+
+        adapter = _TimeoutHTTPAdapter()
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
+
+
+def ticker_with_timeout(symbol: str) -> yf.Ticker:
+    """Create a ``yf.Ticker`` whose HTTP session has a default timeout.
+
+    IMPORTANT: uses curl_cffi (Chrome TLS impersonation) when available, so
+    Yahoo's bot-detection does NOT trigger false 429 rate-limits. The
+    previous implementation created a plain ``requests.Session`` which
+    overwrote yfinance's built-in curl_cffi session and caused every request
+    to be rate-limited.
+    """
+    return yf.Ticker(symbol, session=_create_timeout_session())
+
+
+def yf_retry(func, max_retries=2, base_delay=2.0):
     """Execute a yfinance call with exponential backoff on rate limits.
 
     yfinance raises YFRateLimitError on HTTP 429 responses but does not
     retry them internally. This wrapper adds retry logic specifically
     for rate limits. Other exceptions propagate immediately.
+
+    Retry schedule (2 retries, 2s base, ±25% jitter):
+      attempt 1: ~2s   attempt 2: ~4s
+    Total backoff window: ~6s — quick verdict so the vendor chain can
+    fall through to the next configured source (e.g. Alpha Vantage)
+    without excessive latency.
+
+    IMPORTANT: the wrapped ``func`` must accept a ``timeout`` keyword
+    argument (either directly or by swallowing it via ``**kwargs``)
+    because yfinance's underlying ``requests`` calls have no default
+    timeout and WILL hang indefinitely when Yahoo Finance's edge servers
+    drop the TCP connection without a response.
     """
+    import random as _random
+
     for attempt in range(max_retries + 1):
         try:
             return func()
         except YFRateLimitError:
             if attempt < max_retries:
                 delay = base_delay * (2 ** attempt)
-                logger.warning(f"Yahoo Finance rate limited, retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries})")
+                # ±25% jitter avoids thundering-herd on retry.
+                delay *= 0.75 + 0.5 * _random.random()
+                logger.warning(
+                    "Yahoo Finance rate limited, retrying in %.0fs "
+                    "(attempt %d/%d)",
+                    delay, attempt + 1, max_retries,
+                )
                 time.sleep(delay)
             else:
                 raise
@@ -110,6 +188,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
             multi_level_index=False,
             progress=False,
             auto_adjust=True,
+            timeout=30,
         ))
         downloaded = _ensure_date_column(downloaded.reset_index())
         # Only cache real data — never persist an empty frame.

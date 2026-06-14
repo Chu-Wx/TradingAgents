@@ -207,9 +207,22 @@ def route_to_vendor(method: str, *args, **kwargs):
             f"fabricate values — report that data is unavailable for this symbol."
         )
 
-    # No vendor returned data and none reported clean "no data" — surface the
-    # first real error (e.g. the primary vendor's network failure).
+    # All vendors exhausted — every one either errored, rate-limited, or had no
+    # data.  Return an explicit NO_DATA sentinel rather than raising so the
+    # agent pipeline can continue with whatever data other tools succeeded at
+    # fetching, instead of crashing the whole run.
+    reason_parts = []
     if first_error is not None:
-        raise first_error
-
-    raise RuntimeError(f"No available vendor for '{method}'")
+        reason_parts.append(str(first_error))
+    if last_no_data is not None:
+        reason_parts.append(
+            f"symbol '{last_no_data.symbol}' not recognised by any vendor"
+        )
+    reason = "; ".join(reason_parts) if reason_parts else "all vendors unavailable"
+    logger.warning("Returning NO_DATA for %s: %s", method, reason)
+    return (
+        f"NO_DATA_AVAILABLE: All configured vendors failed for '{method}'. "
+        f"Reason: {reason}. Do not estimate or fabricate values — report that "
+        f"data is unavailable for this symbol and proceed with the analysis "
+        f"using whatever other information is available."
+    )

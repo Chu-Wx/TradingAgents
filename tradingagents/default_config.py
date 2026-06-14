@@ -39,7 +39,47 @@ def _apply_env_overrides(config: dict) -> dict:
         if raw is None or raw == "":
             continue
         config[key] = _coerce(raw, config.get(key))
+
+    # --- DATA VENDORS override -------------------------------------------
+    # ``TRADINGAGENTS_DATA_VENDORS`` sets the vendor chain for *every*
+    # category at once (e.g. "yfinance,alpha_vantage"). Individual
+    # TRADINGAGENTS_DATA_VENDORS_<category> vars override a single category.
+    _apply_data_vendors_overrides(config)
+    # When an Alpha Vantage API key is present, unconditionally append
+    # alpha_vantage as the last-resort fallback for categories that don't
+    # already include it, so yfinance rate limits are transparently handled.
+    _apply_alpha_vantage_fallback(config)
+
     return config
+
+
+def _apply_data_vendors_overrides(config: dict) -> None:
+    """Merge ``TRADINGAGENTS_DATA_VENDORS*`` env vars into data_vendors."""
+    vendors = config.setdefault("data_vendors", {})
+    # Global override: applies to every category
+    global_chain = os.environ.get("TRADINGAGENTS_DATA_VENDORS")
+    if global_chain and global_chain.strip():
+        chain = global_chain.strip()
+        for category in vendors:
+            vendors[category] = chain
+    # Per-category override: TRADINGAGENTS_DATA_VENDORS_core_stock_apis, etc.
+    for env_name, value in os.environ.items():
+        if not env_name.startswith("TRADINGAGENTS_DATA_VENDORS_"):
+            continue
+        category = env_name[len("TRADINGAGENTS_DATA_VENDORS_"):].lower()
+        if category in vendors and value and value.strip():
+            vendors[category] = value.strip()
+
+
+def _apply_alpha_vantage_fallback(config: dict) -> None:
+    """Append alpha_vantage to every category when its API key is present."""
+    if not os.environ.get("ALPHA_VANTAGE_API_KEY"):
+        return
+    vendors = config.setdefault("data_vendors", {})
+    for category, chain in list(vendors.items()):
+        entries = [v.strip() for v in chain.split(",")]
+        if "alpha_vantage" not in entries:
+            vendors[category] = ",".join(entries + ["alpha_vantage"])
 
 
 DEFAULT_CONFIG = _apply_env_overrides({
