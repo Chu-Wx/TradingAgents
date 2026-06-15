@@ -12,6 +12,7 @@ from .y_finance import (
     get_insider_transactions as get_yfinance_insider_transactions,
 )
 from .yfinance_news import get_news_yfinance, get_global_news_yfinance
+from .finnhub import get_news as get_finnhub_news, get_analyst_recommendations as get_finnhub_analyst_recs
 from .alpha_vantage import (
     get_stock as get_alpha_vantage_stock,
     get_indicator as get_alpha_vantage_indicator,
@@ -51,7 +52,8 @@ TOOLS_CATEGORIES = {
             "get_fundamentals",
             "get_balance_sheet",
             "get_cashflow",
-            "get_income_statement"
+            "get_income_statement",
+            "get_analyst_recommendations",
         ]
     },
     "news_data": {
@@ -65,6 +67,7 @@ TOOLS_CATEGORIES = {
 }
 
 VENDOR_LIST = [
+    "finnhub",
     "yfinance",
     "alpha_vantage",
 ]
@@ -98,8 +101,14 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
     },
+    "get_analyst_recommendations": {
+        "finnhub": get_finnhub_analyst_recs,
+        # yfinance + alpha_vantage: not yet implemented; finnhub is the
+        # primary source for analyst consensus data.
+    },
     # news_data
     "get_news": {
+        "finnhub": get_finnhub_news,
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
     },
@@ -155,10 +164,16 @@ def route_to_vendor(method: str, *args, **kwargs):
     if explicit:
         vendor_chain = [v for v in explicit if v in VENDOR_METHODS[method]]
         if not vendor_chain:
-            raise ValueError(
-                f"Configured vendor(s) {explicit} not available for '{method}'. "
-                f"Available: {all_available_vendors}."
+            # None of the configured vendors implement this method (e.g.
+            # finnhub is omitted from the global chain but is the only
+            # vendor for get_analyst_recommendations). Fall back to all
+            # available vendors for this method rather than crashing.
+            logger.debug(
+                "No configured vendor available for '%s' (chain: %s); "
+                "falling back to available: %s",
+                method, explicit, all_available_vendors,
             )
+            vendor_chain = all_available_vendors
     else:
         vendor_chain = all_available_vendors
 
