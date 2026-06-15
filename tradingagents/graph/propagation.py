@@ -22,6 +22,7 @@ class Propagator:
         asset_type: str = "stock",
         past_context: str = "",
         instrument_context: str = "",
+        total_analyst_count: int = 4,
     ) -> Dict[str, Any]:
         """Create the initial state for the agent graph.
 
@@ -30,6 +31,10 @@ class Propagator:
         ``TradingAgentsGraph.resolve_instrument_context``). When empty, agents
         fall back to ticker-only context via
         ``get_instrument_context_from_state``.
+
+        ``total_analyst_count`` sets the number of analyst slots that must
+        complete before the research debate phase begins (used for parallel
+        fan-in synchronization).
         """
         return {
             "messages": [("human", company_name)],
@@ -66,6 +71,8 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            "analyst_reports_completed": 0,
+            "total_analyst_count": total_analyst_count,
         }
 
     def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:

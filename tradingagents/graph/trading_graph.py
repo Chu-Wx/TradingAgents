@@ -72,6 +72,7 @@ class TradingAgentsGraph:
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
         self.callbacks = callbacks or []
+        self.selected_analysts = selected_analysts
 
         # Update the interface's config
         set_config(self.config)
@@ -378,6 +379,7 @@ class TradingAgentsGraph:
             asset_type=asset_type,
             past_context=past_context,
             instrument_context=instrument_context,
+            total_analyst_count=len(self.selected_analysts),
         )
         args = self.propagator.get_graph_args()
 

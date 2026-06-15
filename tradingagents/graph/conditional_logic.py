@@ -11,6 +11,17 @@ class ConditionalLogic:
         self.max_debate_rounds = max_debate_rounds
         self.max_risk_discuss_rounds = max_risk_discuss_rounds
 
+    def should_proceed_to_research(self, state: AgentState) -> str:
+        """Fan-in gate: only route to Bull Researcher when ALL analyst reports
+        are complete.  Until then the current branch terminates so the graph
+        waits for the remaining parallel branches to finish.
+        """
+        completed = state.get("analyst_reports_completed", 0)
+        total = state.get("total_analyst_count", 4)
+        if completed >= total:
+            return "Bull Researcher"
+        return "__end__"
+
     def should_continue_market(self, state: AgentState):
         """Determine if market analysis should continue."""
         messages = state["messages"]

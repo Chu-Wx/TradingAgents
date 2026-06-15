@@ -172,7 +172,8 @@ def get_instrument_context_from_state(state: Mapping[str, Any]) -> str:
 
 def create_msg_delete():
     def delete_messages(state):
-        """Clear messages and add a context-anchored placeholder.
+        """Clear messages, add a context-anchored placeholder, and increment
+        the analyst-completion counter so parallel branches can fan-in.
 
         The placeholder must not be a bare ``"Continue"``: some
         OpenAI-compatible providers interpret that literally as the user task
@@ -192,7 +193,10 @@ def create_msg_delete():
                 f"{instrument_context} The analysis date is {trade_date}."
             )
         )
-        return {"messages": removal_operations + [placeholder]}
+        return {
+            "messages": removal_operations + [placeholder],
+            "analyst_reports_completed": 1,  # accumulated via operator.add reducer
+        }
 
     return delete_messages
 
