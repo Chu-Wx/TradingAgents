@@ -284,11 +284,14 @@ class TradingAgentsGraph:
         if not pending:
             return
 
+        holding_days = self.config.get("reflection_holding_days", 20)
         benchmark = self._resolve_benchmark(ticker)
         updates = []
         for entry in pending:
             raw, alpha, days = self._fetch_returns(
-                ticker, entry["date"], benchmark=benchmark,
+                ticker, entry["date"],
+                holding_days=holding_days,
+                benchmark=benchmark,
             )
             if raw is None:
                 continue  # price not available yet — try again next run

@@ -127,6 +127,12 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "news_article_limit": 20,             # max articles per ticker (ticker-news)
     "global_news_article_limit": 10,      # max articles for global/macro news
     "global_news_lookback_days": 10,       # macro news lookback window
+    # Number of calendar days used to measure realised returns for memory-log
+    # resolution and reflection generation.  20 days ≈ 1 calendar month of
+    # trading, which filters out the noise of 5-day windows while still
+    # providing timely feedback.  Set lower for faster feedback (but noisier
+    # reflections), higher for signal quality (but slower to resolve).
+    "reflection_holding_days": 20,
     # Search queries used by get_global_news for macro headlines. Extend or
     # replace to broaden geographic / sector coverage.
     "global_news_queries": [
