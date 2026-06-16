@@ -1,8 +1,8 @@
 # TradingAgents/graph/propagation.py
 
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from tradingagents.agents.utils.agent_states import (
-    AgentState,
     InvestDebateState,
     RiskDebateState,
 )
@@ -24,7 +24,7 @@ class Propagator:
         instrument_context: str = "",
         analyst_reflection_context: str = "",
         total_analyst_count: int = 4,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create the initial state for the agent graph.
 
         ``instrument_context`` is the deterministic ticker-identity string
@@ -80,7 +80,7 @@ class Propagator:
             "total_analyst_count": total_analyst_count,
         }
 
-    def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:
+    def get_graph_args(self, callbacks: list | None = None) -> dict[str, Any]:
         """Get arguments for the graph invocation.
 
         Args:
