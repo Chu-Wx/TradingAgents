@@ -30,6 +30,7 @@ def create_news_analyst(llm):
             [
                 (
                     "system",
+                    "{analyst_reflection_context}"
                     "You are a helpful AI assistant, collaborating with other assistants."
                     " Use the provided tools to progress towards answering the question."
                     " If you are unable to fully answer, that's OK; another assistant with different tools"
@@ -47,6 +48,9 @@ def create_news_analyst(llm):
         prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
+        prompt = prompt.partial(
+            analyst_reflection_context=state.get("analyst_reflection_context", "")
+        )
 
         chain = prompt | llm.bind_tools(tools)
         result = chain.invoke(state["messages"])

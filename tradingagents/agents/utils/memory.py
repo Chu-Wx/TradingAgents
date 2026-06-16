@@ -95,6 +95,123 @@ class TradingMemoryLog:
             parts.extend(self._format_reflection_only(e) for e in cross)
         return "\n\n".join(parts)
 
+    def get_analyst_reflection_context(
+        self, ticker: str, n: int = 3, current_date: str = "",
+    ) -> str:
+        """Return concise calibration context for analyst prompts.
+
+        Extracts REFLECTION sections from the most recent resolved same-ticker
+        entries only.  Cross-ticker lessons are intentionally excluded — this
+        context is meant to calibrate the analysts against *specific* prior
+        mistakes or successes on the same instrument.
+
+        When ``current_date`` is provided (ISO format, e.g. "2025-06-01"), a
+        time-distance note is added for reflections older than 6 months so the
+        analyst can evaluate whether lessons from a different market regime
+        still apply.
+
+        Returns an empty string when there are no resolved entries for the ticker.
+        """
+        from datetime import datetime, timedelta
+
+        entries = [
+            e for e in self.load_entries()
+            if not e.get("pending") and e["ticker"] == ticker
+        ]
+        if not entries:
+            return ""
+
+        recent = list(reversed(entries))[:n]
+
+        # Compute time distance if current_date is provided
+        time_warning = ""
+        current_dt = None
+        if current_date:
+            try:
+                current_dt = datetime.strptime(current_date, "%Y-%m-%d")
+            except ValueError:
+                pass
+
+        if current_dt and recent:
+            newest_dt = datetime.strptime(recent[0]["date"], "%Y-%m-%d")
+            delta_days = (current_dt - newest_dt).days
+
+            if delta_days < -180:
+                # Reflection is from well AFTER the current analysis date
+                # (common in backtesting: running a past date with entries
+                # from later runs already in the log).
+                time_warning = (
+                    "\n⚠️  **Regime-shift warning:** The reflections below "
+                    f"are from {recent[0]['date']}, which is "
+                    f"{abs(delta_days) / 30.44:.0f} months AFTER your "
+                    "current analysis date. They were generated in a "
+                    "different market cycle. Evaluate each lesson's "
+                    "applicability to the *current* environment, not the "
+                    "later one it was written for.\n"
+                )
+            elif delta_days > 180:
+                time_warning = (
+                    "\n⚠️  **Time-distance warning:** The most recent "
+                    f"reflection is from {recent[0]['date']} "
+                    f"({delta_days / 30.44:.0f} months ago). "
+                    "Market conditions — interest rates, sector leadership, "
+                    "volatility regime — may differ materially from the current "
+                    "environment. Evaluate each lesson's applicability rather "
+                    "than applying it blindly.\n"
+                )
+            elif delta_days > 30:
+                time_warning = (
+                    f"\n🕐 The most recent reflection is from "
+                    f"{recent[0]['date']} ({delta_days / 30.44:.0f} months ago). "
+                    "Consider whether market conditions have shifted.\n"
+                )
+
+        parts = [
+            "## Calibration: Lessons from your past analyses of this ticker\n"
+            "Before writing your report, review these reflections from prior "
+            "decisions on the same instrument.  If a prior error was caused by "
+            "over-reliance on a specific indicator, weighting, or assumption, "
+            "adjust your analysis accordingly."
+            + time_warning
+            + "\n"
+        ]
+        for e in recent:
+            raw_ret = e.get("raw") or "n/a"
+            alpha_ret = e.get("alpha") or "n/a"
+            rating = e.get("rating", "unknown")
+
+            # Include time distance in each entry header
+            time_note = ""
+            if current_dt:
+                try:
+                    entry_dt = datetime.strptime(e["date"], "%Y-%m-%d")
+                    delta_days = (current_dt - entry_dt).days
+                    abs_months = abs(delta_days) / 30.44
+                    if abs_months > 1:
+                        if delta_days < 0:
+                            time_note = f" ({abs_months:.0f} months later — different cycle)"
+                        else:
+                            time_note = f" ({abs_months:.0f} months ago)"
+                except ValueError:
+                    pass
+
+            header = (
+                f"### {e['date']}{time_note}: rated **{rating}** → "
+                f"realized {raw_ret} (alpha {alpha_ret})"
+            )
+            if e.get("reflection"):
+                parts.append(f"{header}\n{e['reflection']}")
+            else:
+                snippet = (e.get("decision") or "")[:300]
+                parts.append(f"{header}\n{snippet}")
+
+        parts.append(
+            "\n*Use these lessons to calibrate your analysis. "
+            "Your goal is to avoid repeating past mistakes while building on "
+            "past successes.*\n"
+        )
+        return "\n\n".join(parts)
+
     # --- Update path (Phase B) ---
 
     def update_with_outcome(

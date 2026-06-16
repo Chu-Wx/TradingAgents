@@ -70,6 +70,8 @@ def create_sentiment_analyst(llm):
         stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
         reddit_block = fetch_reddit_posts(ticker)
 
+        reflection_context = state.get("analyst_reflection_context", "")
+
         system_message = _build_system_message(
             ticker=ticker,
             start_date=start_date,
@@ -77,6 +79,7 @@ def create_sentiment_analyst(llm):
             news_block=news_block,
             stocktwits_block=stocktwits_block,
             reddit_block=reddit_block,
+            analyst_reflection_context=reflection_context,
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -126,9 +129,15 @@ def _build_system_message(
     news_block: str,
     stocktwits_block: str,
     reddit_block: str,
+    analyst_reflection_context: str = "",
 ) -> str:
     """Assemble the sentiment-analyst system message with structured data blocks."""
-    return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
+    reflection_prefix = (
+        f"{analyst_reflection_context}\n\n"
+        if analyst_reflection_context
+        else ""
+    )
+    return f"""{reflection_prefix}You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
 
 ## Data sources (pre-fetched, in this prompt)
 

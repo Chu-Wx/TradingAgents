@@ -22,6 +22,7 @@ class Propagator:
         asset_type: str = "stock",
         past_context: str = "",
         instrument_context: str = "",
+        analyst_reflection_context: str = "",
         total_analyst_count: int = 4,
     ) -> Dict[str, Any]:
         """Create the initial state for the agent graph.
@@ -31,6 +32,9 @@ class Propagator:
         ``TradingAgentsGraph.resolve_instrument_context``). When empty, agents
         fall back to ticker-only context via
         ``get_instrument_context_from_state``.
+
+        ``analyst_reflection_context`` carries lessons from past same-ticker
+        decisions so analysts calibrate against prior mistakes.
 
         ``total_analyst_count`` sets the number of analyst slots that must
         complete before the research debate phase begins (used for parallel
@@ -43,6 +47,7 @@ class Propagator:
             "instrument_context": instrument_context,
             "trade_date": str(trade_date),
             "past_context": past_context,
+            "analyst_reflection_context": analyst_reflection_context,
             "investment_debate_state": InvestDebateState(
                 {
                     "bull_history": "",
