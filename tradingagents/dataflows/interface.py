@@ -29,6 +29,10 @@ from .y_finance import (
     get_YFin_data_online,
 )
 from .yfinance_news import get_global_news_yfinance, get_news_yfinance
+from .finnhub import (
+    get_analyst_recommendations as get_finnhub_analyst_recs,
+    get_news as get_finnhub_news,
+)
 
 logger = logging.getLogger(__name__)
 
